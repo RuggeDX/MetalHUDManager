@@ -2,8 +2,7 @@
 
 A small macOS app to turn Apple's **Metal Performance HUD** (FPS, frame time, GPU memory, etc.) on **per application**, instead of globally for every app that happens to draw with Metal.
 
-<!-- Add a screenshot: save it as docs/screenshot.png and uncomment the line below -->
-<!-- ![Metal HUD Manager](docs/screenshot.png) -->
+![Metal HUD Manager](docs/screenshot.png)
 
 ## Why
 
