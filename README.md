@@ -95,6 +95,8 @@ defaults delete com.example.game MetalForceHudEnabled   # per app
 
 Compiles a debug build, runs it, and rebuilds and relaunches it every time you save `Sources/MetalHUDManager.swift`. Use `./dev.sh --once` to just build and run. Prefix it with `MHM_MOCK_UPDATE=1` to preview the update button and dialog with a fake release. The dev build runs as a bare binary (no icon, separate settings); use `./build-app.sh` to test the real app.
 
+In VS Code, **⇧⌘B** starts the live dev build, and **Terminal → Run Task…** has tasks for the mock-update preview, installing a release build, and building the DMG.
+
 ## Building releases
 
 Pushing a tag starting with `v` triggers the GitHub Actions workflow, which builds a universal (Apple Silicon + Intel) app and attaches a `.dmg` and a `.zip` to a GitHub release. To build the disk image locally, run `./make-dmg.sh` after `./build-app.sh`.
