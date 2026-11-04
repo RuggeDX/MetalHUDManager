@@ -21,15 +21,30 @@ let appTitle = "Metal HUD Manager"
 // MARK: - Model types
 
 struct AppEntry: Identifiable, Hashable {
-    let id: String      // bundle identifier
+    enum Kind {
+        case app             // an .app bundle found on disk
+        case pinnedProcess   // a running process the user added to the list (e.g. a game started by a launcher)
+        case runningProcess  // a running process that isn't in the list yet
+    }
+
+    let id: String      // preferences domain: the bundle identifier, or the executable name if there is none
     let name: String
     let url: URL
     var hudEnabled: Bool
     let detectedGame: Bool  // heuristic, see Scanner.looksLikeGame; the user can override it
+    var isLauncher = false
+    var kind = Kind.app
+}
+
+/// A process the user pinned to the list, stored in UserDefaults.
+struct PinnedProcess: Codable {
+    let id: String
+    let name: String
+    let path: String
 }
 
 enum AppFilter: String, CaseIterable, Identifiable {
-    case all, games, enabled
+    case all, games, enabled, running
     var id: Self { self }
 
     var title: String {
@@ -37,6 +52,7 @@ enum AppFilter: String, CaseIterable, Identifiable {
         case .all: "All Apps"
         case .games: "Games"
         case .enabled: "HUD Enabled"
+        case .running: "Running"
         }
     }
 }
@@ -97,9 +113,26 @@ enum Scanner {
         let name = (info["CFBundleDisplayName"] as? String)
             ?? (info["CFBundleName"] as? String)
             ?? url.deletingPathExtension().lastPathComponent
+        let launcher = launcherIDs.contains(id)
         return AppEntry(id: id, name: name, url: url, hudEnabled: Prefs.isEnabled(bundleID: id),
-                        detectedGame: looksLikeGame(url: url, info: info))
+                        detectedGame: launcher || looksLikeGame(url: url, info: info), isLauncher: launcher)
     }
+
+    /// Launchers start their games as separate processes that don't show up as apps of their own.
+    static let launcherIDs: Set<String> = [
+        "com.mojang.minecraftlauncher",
+        "com.valvesoftware.steam",
+        "com.epicgames.EpicGamesLauncher",
+        "net.battle.app",
+        "net.battle.bootstrapper",
+        "com.gog.galaxy",
+        "org.prismlauncher.PrismLauncher",
+        "com.modrinth.theseus",
+        "com.overwolf.curseforge",
+        "com.heroicgameslauncher.hgl",
+        "com.codeweavers.CrossOver",
+        "com.isaacmarovitz.Whisky",
+    ]
 
     /// Files that common game engines and Steam's SDK put inside an app bundle.
     private static let gameMarkers = [
@@ -257,6 +290,64 @@ final class Model: ObservableObject {
         set { UserDefaults.standard.set(newValue, forKey: extraKey) }
     }
 
+    private let pinnedKey = "pinnedProcesses"
+    private var pinned: [PinnedProcess] {
+        get {
+            guard let data = UserDefaults.standard.data(forKey: pinnedKey) else { return [] }
+            return (try? JSONDecoder().decode([PinnedProcess].self, from: data)) ?? []
+        }
+        set { UserDefaults.standard.set(try? JSONEncoder().encode(newValue), forKey: pinnedKey) }
+    }
+
+    private var observers: [NSObjectProtocol] = []
+
+    init() {
+        // Refresh "running" badges and the Running filter when apps start or quit.
+        let center = NSWorkspace.shared.notificationCenter
+        for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification] {
+            observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in self?.objectWillChange.send() }
+            })
+        }
+    }
+
+    /// The preferences domain a running process reads: its bundle identifier (also from an
+    /// Info.plist embedded in a bare executable, like Java's), or else its executable name.
+    static func domain(of process: NSRunningApplication) -> String? {
+        process.bundleIdentifier ?? process.executableURL?.lastPathComponent
+    }
+
+    /// Running apps with a Dock icon that aren't in the list, such as a game started by a
+    /// launcher (Minecraft: Java Edition runs as a `java` process).
+    func runningProcesses() -> [AppEntry] {
+        let known = Set(apps.map(\.id))
+        var seen = Set<String>()
+        return NSWorkspace.shared.runningApplications.compactMap { process -> AppEntry? in
+            guard process.activationPolicy == .regular,
+                  process.processIdentifier != ProcessInfo.processInfo.processIdentifier,
+                  let id = Self.domain(of: process), !known.contains(id), seen.insert(id).inserted,
+                  let url = (process.bundleURL?.pathExtension == "app" ? process.bundleURL : nil) ?? process.executableURL
+            else { return nil }
+            return AppEntry(id: id, name: process.localizedName ?? id, url: url,
+                            hudEnabled: Prefs.isEnabled(bundleID: id), detectedGame: false, kind: .runningProcess)
+        }
+        .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    /// Adds a running process to the list permanently, under a name of the user's choosing.
+    func pin(_ app: AppEntry, name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        var list = pinned.filter { $0.id != app.id }
+        list.append(PinnedProcess(id: app.id, name: trimmed.isEmpty ? app.name : trimmed, path: app.url.path))
+        pinned = list
+        reload()
+    }
+
+    func unpin(_ app: AppEntry) {
+        pinned = pinned.filter { $0.id != app.id }
+        reload()
+    }
+
     func isGame(_ app: AppEntry) -> Bool { gameOverrides[app.id] ?? app.detectedGame }
 
     /// Marks an app as a game or not. Choosing what the heuristic already says clears the override.
@@ -265,9 +356,10 @@ final class Model: ObservableObject {
     }
 
     var filtered: [AppEntry] {
-        apps.filter { app in
+        let base = filter == .running ? apps.filter { isRunning($0) } + runningProcesses() : apps
+        return base.filter { app in
             let matchesFilter = switch filter {
-            case .all: true
+            case .all, .running: true
             case .games: isGame(app)
             case .enabled: app.hudEnabled
             }
@@ -281,11 +373,19 @@ final class Model: ObservableObject {
     func reload() {
         loading = true
         let extras = extraPaths.map { URL(fileURLWithPath: $0) }
+        let pins = pinned
         Task.detached {
-            let list = Scanner.scan(extra: extras)
+            var list = Scanner.scan(extra: extras)
+            let scanned = Set(list.map(\.id))
+            list += pins.filter { !scanned.contains($0.id) }.map { pin in
+                AppEntry(id: pin.id, name: pin.name, url: URL(fileURLWithPath: pin.path),
+                         hudEnabled: Prefs.isEnabled(bundleID: pin.id), detectedGame: true, kind: .pinnedProcess)
+            }
+            list.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
             let global = Prefs.globalEnabled()
+            let result = list
             await MainActor.run {
-                self.apps = list
+                self.apps = result
                 self.globalOn = global
                 self.loading = false
             }
@@ -304,7 +404,7 @@ final class Model: ObservableObject {
     }
 
     func isRunning(_ app: AppEntry) -> Bool {
-        !NSRunningApplication.runningApplications(withBundleIdentifier: app.id).isEmpty
+        NSWorkspace.shared.runningApplications.contains { Self.domain(of: $0) == app.id }
     }
 
     func setHUD(_ on: Bool, for app: AppEntry) {
@@ -381,6 +481,8 @@ final class Model: ObservableObject {
 struct AppRow: View {
     let app: AppEntry
     @ObservedObject var model: Model
+    @State private var naming = false
+    @State private var nameDraft = ""
 
     var body: some View {
         let running = model.isRunning(app)
@@ -411,18 +513,35 @@ struct AppRow: View {
             Spacer()
 
             if running && model.needsRestart.contains(app.id) {
-                Button("Restart to apply") { model.relaunch(app, envHUD: false) }
-                    .controlSize(.small)
+                if app.kind == .app {
+                    Button("Restart to apply") { model.relaunch(app, envHUD: false) }
+                        .controlSize(.small)
+                } else {
+                    Text("Restart to apply").font(.caption).foregroundStyle(.secondary)
+                }
             }
 
             Menu {
-                Button(running ? "Relaunch" : "Launch") { model.relaunch(app, envHUD: false) }
-                Button("Launch once with HUD (env var)") { model.relaunch(app, envHUD: true) }
-                Divider()
-                if model.isGame(app) {
-                    Button("Not a Game") { model.setGame(false, for: app) }
-                } else {
-                    Button("Mark as Game") { model.setGame(true, for: app) }
+                if app.kind == .app {
+                    Button(running ? "Relaunch" : "Launch") { model.relaunch(app, envHUD: false) }
+                    Button(app.isLauncher ? "Launch once with HUD (also for games it starts)"
+                                          : "Launch once with HUD (env var)") { model.relaunch(app, envHUD: true) }
+                    Divider()
+                }
+                if app.kind == .runningProcess {
+                    Button("Add to List…") { startNaming() }
+                }
+                if app.kind == .pinnedProcess {
+                    Button("Rename…") { startNaming() }
+                    Button("Remove from List") { model.unpin(app) }
+                    Divider()
+                }
+                if app.kind != .runningProcess {
+                    if model.isGame(app) {
+                        Button("Not a Game") { model.setGame(false, for: app) }
+                    } else {
+                        Button("Mark as Game") { model.setGame(true, for: app) }
+                    }
                 }
                 Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([app.url]) }
             } label: {
@@ -431,14 +550,31 @@ struct AppRow: View {
             .menuStyle(.borderlessButton)
             .fixedSize()
 
-            Toggle("HUD", isOn: Binding(
-                get: { app.hudEnabled },
-                set: { model.setHUD($0, for: app) }
-            ))
-            .toggleStyle(.switch)
-            .labelsHidden()
+            if app.kind == .runningProcess {
+                Button("Add to List…") { startNaming() }
+                    .controlSize(.small)
+            } else {
+                Toggle("HUD", isOn: Binding(
+                    get: { app.hudEnabled },
+                    set: { model.setHUD($0, for: app) }
+                ))
+                .toggleStyle(.switch)
+                .labelsHidden()
+            }
         }
         .padding(.vertical, 2)
+        .alert(app.kind == .pinnedProcess ? "Rename" : "Add to List", isPresented: $naming) {
+            TextField("Name", text: $nameDraft)
+            Button(app.kind == .pinnedProcess ? "Rename" : "Add") { model.pin(app, name: nameDraft) }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The HUD switch for this entry sets the preference for “\(app.id)”, so it applies to everything that runs as this process.")
+        }
+    }
+
+    private func startNaming() {
+        nameDraft = app.name
+        naming = true
     }
 }
 
@@ -447,12 +583,14 @@ struct BulkToggleRow: View {
     @State private var pending: Bool?
 
     var body: some View {
-        let shown = model.filtered
+        // Processes that aren't in the list yet have no switch, so they're left out.
+        let shown = model.filtered.filter { $0.kind != .runningProcess }
         let enabledCount = shown.filter(\.hudEnabled).count
         let allOn = !shown.isEmpty && enabledCount == shown.count
         let title = !model.search.isEmpty ? "All shown apps"
             : model.filter == .games ? "All games"
             : model.filter == .enabled ? "All shown apps"
+            : model.filter == .running ? "All running apps"
             : "All apps"
 
         HStack(spacing: 10) {
@@ -476,7 +614,7 @@ struct BulkToggleRow: View {
             isPresented: Binding(get: { pending != nil }, set: { if !$0 { pending = nil } })
         ) {
             Button(pending == true ? "Enable All" : "Disable All") {
-                if let on = pending { model.setHUD(on, for: model.filtered) }
+                if let on = pending { model.setHUD(on, for: shown) }
                 pending = nil
             }
             Button("Cancel", role: .cancel) { pending = nil }

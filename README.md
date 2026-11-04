@@ -21,7 +21,8 @@ That works, but the overlay then also appears in browsers, Electron apps and oth
 - **Launch once with HUD**: starts an app with the `MTL_HUD_ENABLED=1` environment variable, without saving anything (handy for apps that ignore the per-app setting)
 - Shows which apps are running and offers a one-click restart so changes take effect
 - Detects the global setting and lets you switch it off
-- Search, a filter for **All Apps / Games / HUD Enabled**, and **Add App…** for apps in other locations
+- Search, a filter for **All Apps / Games / HUD Enabled / Running**, and **Add App…** for apps in other locations
+- **Games started by a launcher** (e.g. Minecraft, which runs as a `java` process): open the game, pick **Running**, and use **Add to List…** to keep it in the list with its own switch
 - Detects likely games (App Store games category, game controller support, Steam installs, Unity/Unreal/Godot builds); use **Mark as Game** / **Not a Game** in the **…** menu to correct it
 - Checks GitHub for a newer release on launch and shows a download button with the changelog when one is available
 
@@ -74,6 +75,7 @@ Turning a switch off deletes that key again. "Launch once with HUD" uses `NSWork
 ## Notes and limitations
 
 - Most apps pick up the per-app setting, but some (certain sandboxed apps, Wine/CrossOver wrappers) don't. Use **Launch once with HUD** for those.
+- Entries added from **Running** set the preference for that process's identity. For a shared runtime (Minecraft's `java` is `net.java.openjdk.java`), that also enables the HUD for other apps running on it. Starting a launcher with **Launch once with HUD** usually passes the HUD on to the games it starts, too.
 - On recent macOS versions, changing settings for sandboxed apps can trigger a prompt asking whether Metal HUD Manager may access data from other apps. Allow it, or those switches won't stick.
 - On launch the app makes one request to the GitHub API to check for a newer release. Nothing else is sent.
 - Locally built copies are signed ad-hoc, so macOS may ask for that permission again after a rebuild.
