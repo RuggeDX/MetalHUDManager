@@ -42,7 +42,7 @@ This builds `Metal HUD Manager.app` and copies it to `/Applications`. Without `-
 
 ### Option 2: Download a release
 
-Download the latest `.zip` from the [Releases](../../releases) page and move the app to `/Applications`.
+Download the latest `.dmg` from the [Releases](../../releases) page, open it, and drag **Metal HUD Manager** into the **Applications** folder. A `.zip` is available too if you prefer.
 
 The release builds are **not notarized** by Apple, so macOS will block the first launch. To allow it, open the app once, then go to **System Settings → Privacy & Security** and click **Open Anyway**. Alternatively, remove the quarantine flag yourself:
 
@@ -94,7 +94,7 @@ Compiles a debug build, runs it, and rebuilds and relaunches it every time you s
 
 ## Building releases
 
-Pushing a tag starting with `v` triggers the GitHub Actions workflow, which builds a universal (Apple Silicon + Intel) app and attaches the zip to a GitHub release:
+Pushing a tag starting with `v` triggers the GitHub Actions workflow, which builds a universal (Apple Silicon + Intel) app and attaches a `.dmg` and a `.zip` to a GitHub release. To build the disk image locally, run `./make-dmg.sh` after `./build-app.sh`.
 
 ```bash
 git tag v1.0.0
