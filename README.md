@@ -17,7 +17,7 @@ That works, but the overlay then also appears in browsers, Electron apps and oth
 ## Features
 
 - Lists apps from `/Applications`, `~/Applications` and your Steam library, with icon and bundle ID
-- One switch per app to enable the HUD persistently
+- One switch per app to enable the HUD persistently, plus an "all apps" switch that applies to everything currently shown
 - **Launch once with HUD**: starts an app with the `MTL_HUD_ENABLED=1` environment variable, without saving anything (handy for apps that ignore the per-app setting)
 - Shows which apps are running and offers a one-click restart so changes take effect
 - Detects the global setting and lets you switch it off
@@ -83,6 +83,14 @@ To remove all HUD settings this app has made, switch every app off in the app, o
 defaults delete -g MetalForceHudEnabled 2>/dev/null
 defaults delete com.example.game MetalForceHudEnabled   # per app
 ```
+
+## Development
+
+```bash
+./dev.sh
+```
+
+Compiles a debug build, runs it, and rebuilds and relaunches it every time you save `Sources/MetalHUDManager.swift`. Use `./dev.sh --once` to just build and run. The dev build runs as a bare binary (no icon, separate settings); use `./build-app.sh` to test the real app.
 
 ## Building releases
 

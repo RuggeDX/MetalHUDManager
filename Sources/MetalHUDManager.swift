@@ -9,6 +9,15 @@ import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
 
+// MARK: - Build flavor
+
+/// Development builds from ./dev.sh are compiled with -D DEV.
+#if DEV
+let appTitle = "Metal HUD Manager [DEV]"
+#else
+let appTitle = "Metal HUD Manager"
+#endif
+
 // MARK: - Model types
 
 struct AppEntry: Identifiable, Hashable {
@@ -117,6 +126,7 @@ final class Model: ObservableObject {
     @Published var search = ""
     @Published var onlyEnabled = false
     @Published var needsRestart: Set<String> = []
+    @Published var bulkBusy = false
 
     private let extraKey = "extraAppPaths"
     private var extraPaths: [String] {
@@ -157,6 +167,28 @@ final class Model: ObservableObject {
             apps[i].hudEnabled = Prefs.isEnabled(bundleID: app.id)
         }
         if isRunning(app) { needsRestart.insert(app.id) }
+    }
+
+    /// Enables or disables the HUD for several apps at once.
+    /// Runs off the main thread since each change spawns /usr/bin/defaults.
+    func setHUD(_ on: Bool, for targets: [AppEntry]) {
+        let changed = targets.filter { $0.hudEnabled != on }
+        guard !changed.isEmpty else { return }
+        bulkBusy = true
+        let ids = changed.map(\.id)
+        Task.detached {
+            let results = ids.map { id -> (String, Bool) in
+                Prefs.set(on, bundleID: id)
+                return (id, Prefs.isEnabled(bundleID: id))
+            }
+            await MainActor.run {
+                for (id, enabled) in results {
+                    if let i = self.apps.firstIndex(where: { $0.id == id }) { self.apps[i].hudEnabled = enabled }
+                }
+                for app in changed where self.isRunning(app) { self.needsRestart.insert(app.id) }
+                self.bulkBusy = false
+            }
+        }
     }
 
     func setGlobal(_ on: Bool) {
@@ -253,6 +285,47 @@ struct AppRow: View {
     }
 }
 
+struct BulkToggleRow: View {
+    @ObservedObject var model: Model
+    @State private var pending: Bool?
+
+    var body: some View {
+        let shown = model.filtered
+        let enabledCount = shown.filter(\.hudEnabled).count
+        let allOn = !shown.isEmpty && enabledCount == shown.count
+        let filtering = model.onlyEnabled || !model.search.isEmpty
+
+        HStack(spacing: 10) {
+            Text(filtering ? "All shown apps" : "All apps").font(.headline)
+            Text("\(enabledCount) of \(shown.count) enabled").font(.caption).foregroundStyle(.secondary)
+            Spacer()
+            if model.bulkBusy { ProgressView().controlSize(.small) }
+            Toggle("HUD for all", isOn: Binding(
+                get: { allOn },
+                set: { pending = $0 }
+            ))
+            .toggleStyle(.switch)
+            .labelsHidden()
+            .disabled(shown.isEmpty || model.bulkBusy)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 8)
+        .confirmationDialog(
+            pending == true ? "Enable the HUD for \(shown.count - enabledCount) apps?"
+                            : "Disable the HUD for \(enabledCount) apps?",
+            isPresented: Binding(get: { pending != nil }, set: { if !$0 { pending = nil } })
+        ) {
+            Button(pending == true ? "Enable All" : "Disable All") {
+                if let on = pending { model.setHUD(on, for: model.filtered) }
+                pending = nil
+            }
+            Button("Cancel", role: .cancel) { pending = nil }
+        } message: {
+            Text("Running apps need a restart for the change to take effect.")
+        }
+    }
+}
+
 struct ContentView: View {
     @StateObject private var model = Model()
 
@@ -270,6 +343,9 @@ struct ContentView: View {
                     .background(Color.orange.opacity(0.15))
                 }
 
+                BulkToggleRow(model: model)
+                Divider()
+
                 List(model.filtered) { app in
                     AppRow(app: app, model: model)
                 }
@@ -278,7 +354,7 @@ struct ContentView: View {
                     else if model.filtered.isEmpty { Text("No apps match.").foregroundStyle(.secondary) }
                 }
             }
-            .navigationTitle("Metal HUD Manager")
+            .navigationTitle(appTitle)
             .searchable(text: $model.search, prompt: "Search apps")
             .toolbar {
                 ToolbarItemGroup {
@@ -304,6 +380,6 @@ struct MetalHUDManagerApp: App {
     }
 
     var body: some Scene {
-        WindowGroup("Metal HUD Manager") { ContentView() }
+        WindowGroup(appTitle) { ContentView() }
     }
 }
