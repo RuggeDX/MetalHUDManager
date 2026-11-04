@@ -159,6 +159,9 @@ enum Updater {
 
     /// Latest published release (drafts and pre-releases are excluded by GitHub).
     static func latestRelease() async throws -> ReleaseInfo {
+        #if DEV
+        if ProcessInfo.processInfo.environment["MHM_MOCK_UPDATE"] == "1" { return mockRelease }
+        #endif
         var request = URLRequest(url: URL(string: "https://api.github.com/repos/\(repo)/releases/latest")!)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -167,6 +170,23 @@ enum Updater {
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return try decoder.decode(ReleaseInfo.self, from: data)
     }
+
+    #if DEV
+    /// Fake release for previewing the update UI: MHM_MOCK_UPDATE=1 ./dev.sh
+    static let mockRelease = ReleaseInfo(
+        tagName: "v9.9.9",
+        body: """
+        ## What's Changed
+        * Add an **enable/disable all** switch by @RuggeDX in https://github.com/RuggeDX/MetalHUDManager/pull/1
+        * Attach a `.dmg` to releases by @RuggeDX in https://github.com/RuggeDX/MetalHUDManager/pull/2
+        * Check for [updates](https://github.com/RuggeDX/MetalHUDManager/releases) on launch by @RuggeDX in https://github.com/RuggeDX/MetalHUDManager/pull/3
+
+        **Full Changelog**: https://github.com/RuggeDX/MetalHUDManager/compare/v1.0.0...v9.9.9
+        """,
+        htmlUrl: URL(string: "https://github.com/RuggeDX/MetalHUDManager/releases")!,
+        assets: []
+    )
+    #endif
 }
 
 // MARK: - View model

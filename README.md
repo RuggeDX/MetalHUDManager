@@ -92,7 +92,7 @@ defaults delete com.example.game MetalForceHudEnabled   # per app
 ./dev.sh
 ```
 
-Compiles a debug build, runs it, and rebuilds and relaunches it every time you save `Sources/MetalHUDManager.swift`. Use `./dev.sh --once` to just build and run. The dev build runs as a bare binary (no icon, separate settings); use `./build-app.sh` to test the real app.
+Compiles a debug build, runs it, and rebuilds and relaunches it every time you save `Sources/MetalHUDManager.swift`. Use `./dev.sh --once` to just build and run. Prefix it with `MHM_MOCK_UPDATE=1` to preview the update button and dialog with a fake release. The dev build runs as a bare binary (no icon, separate settings); use `./build-app.sh` to test the real app.
 
 ## Building releases
 

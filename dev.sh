@@ -5,6 +5,7 @@
 # Usage:
 #   ./dev.sh          -> build, run, and relaunch on every save
 #   ./dev.sh --once   -> build and run once
+#   MHM_MOCK_UPDATE=1 ./dev.sh   -> pretend a new release (v9.9.9) is available
 #
 # This runs the bare binary rather than the .app bundle, so it has no icon and
 # keeps its own settings (e.g. apps added with "Add App…") under the domain
