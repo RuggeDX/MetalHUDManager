@@ -25,6 +25,20 @@ struct AppEntry: Identifiable, Hashable {
     let name: String
     let url: URL
     var hudEnabled: Bool
+    let detectedGame: Bool  // heuristic, see Scanner.looksLikeGame; the user can override it
+}
+
+enum AppFilter: String, CaseIterable, Identifiable {
+    case all, games, enabled
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .all: "All Apps"
+        case .games: "Games"
+        case .enabled: "HUD Enabled"
+        }
+    }
 }
 
 // MARK: - Preferences (reading/writing MetalForceHudEnabled)
@@ -83,7 +97,35 @@ enum Scanner {
         let name = (info["CFBundleDisplayName"] as? String)
             ?? (info["CFBundleName"] as? String)
             ?? url.deletingPathExtension().lastPathComponent
-        return AppEntry(id: id, name: name, url: url, hudEnabled: Prefs.isEnabled(bundleID: id))
+        return AppEntry(id: id, name: name, url: url, hudEnabled: Prefs.isEnabled(bundleID: id),
+                        detectedGame: looksLikeGame(url: url, info: info))
+    }
+
+    /// Files that common game engines and Steam's SDK put inside an app bundle.
+    private static let gameMarkers = [
+        "Contents/Frameworks/UnityPlayer.dylib",                // Unity
+        "Contents/Resources/Data/Managed/UnityEngine.dll",      // Unity (older)
+        "Contents/UE",                                          // Unreal Engine 5
+        "Contents/UE4",                                         // Unreal Engine 4
+        "Contents/Frameworks/libsteam_api.dylib",               // Steamworks
+        "Contents/MacOS/libsteam_api.dylib",
+    ]
+
+    /// Best-effort guess: a games App Store category, game controller support,
+    /// installed through Steam, or bundled with a known game engine.
+    static func looksLikeGame(url: URL, info: [String: Any]) -> Bool {
+        if let category = info["LSApplicationCategoryType"] as? String,
+           category == "public.app-category.games" || category.hasSuffix("-games") { return true }
+        if info["GCSupportsControllerUserInteraction"] != nil || info["GCSupportedGameControllers"] != nil { return true }
+        if url.path.contains("/steamapps/common/") { return true }
+        let fm = FileManager.default
+        if gameMarkers.contains(where: { fm.fileExists(atPath: url.appendingPathComponent($0).path) }) { return true }
+        // Godot exports ship their game data as a .pck file.
+        let resources = url.appendingPathComponent("Contents/Resources")
+        if let files = try? fm.contentsOfDirectory(atPath: resources.path), files.contains(where: { $0.hasSuffix(".pck") }) {
+            return true
+        }
+        return false
     }
 
     static func scan(extra: [URL]) -> [AppEntry] {
@@ -197,7 +239,13 @@ final class Model: ObservableObject {
     @Published var globalOn = false
     @Published var loading = false
     @Published var search = ""
-    @Published var onlyEnabled = false
+    @Published var filter = AppFilter(rawValue: UserDefaults.standard.string(forKey: "appFilter") ?? "") ?? .all {
+        didSet { UserDefaults.standard.set(filter.rawValue, forKey: "appFilter") }
+    }
+    /// Per-app "is a game" choices that override the detection heuristic.
+    @Published var gameOverrides = UserDefaults.standard.dictionary(forKey: "gameOverrides") as? [String: Bool] ?? [:] {
+        didSet { UserDefaults.standard.set(gameOverrides, forKey: "gameOverrides") }
+    }
     @Published var needsRestart: Set<String> = []
     @Published var bulkBusy = false
     @Published var update: ReleaseInfo?
@@ -209,9 +257,21 @@ final class Model: ObservableObject {
         set { UserDefaults.standard.set(newValue, forKey: extraKey) }
     }
 
+    func isGame(_ app: AppEntry) -> Bool { gameOverrides[app.id] ?? app.detectedGame }
+
+    /// Marks an app as a game or not. Choosing what the heuristic already says clears the override.
+    func setGame(_ game: Bool, for app: AppEntry) {
+        gameOverrides[app.id] = game == app.detectedGame ? nil : game
+    }
+
     var filtered: [AppEntry] {
         apps.filter { app in
-            (!onlyEnabled || app.hudEnabled) &&
+            let matchesFilter = switch filter {
+            case .all: true
+            case .games: isGame(app)
+            case .enabled: app.hudEnabled
+            }
+            return matchesFilter &&
             (search.isEmpty
              || app.name.localizedCaseInsensitiveContains(search)
              || app.id.localizedCaseInsensitiveContains(search))
@@ -332,6 +392,12 @@ struct AppRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(app.name)
+                    if model.isGame(app) {
+                        Image(systemName: "gamecontroller.fill")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .help("Game")
+                    }
                     if running {
                         Text("running")
                             .font(.caption2)
@@ -353,6 +419,11 @@ struct AppRow: View {
                 Button(running ? "Relaunch" : "Launch") { model.relaunch(app, envHUD: false) }
                 Button("Launch once with HUD (env var)") { model.relaunch(app, envHUD: true) }
                 Divider()
+                if model.isGame(app) {
+                    Button("Not a Game") { model.setGame(false, for: app) }
+                } else {
+                    Button("Mark as Game") { model.setGame(true, for: app) }
+                }
                 Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([app.url]) }
             } label: {
                 Image(systemName: "ellipsis.circle")
@@ -379,10 +450,13 @@ struct BulkToggleRow: View {
         let shown = model.filtered
         let enabledCount = shown.filter(\.hudEnabled).count
         let allOn = !shown.isEmpty && enabledCount == shown.count
-        let filtering = model.onlyEnabled || !model.search.isEmpty
+        let title = !model.search.isEmpty ? "All shown apps"
+            : model.filter == .games ? "All games"
+            : model.filter == .enabled ? "All shown apps"
+            : "All apps"
 
         HStack(spacing: 10) {
-            Text(filtering ? "All shown apps" : "All apps").font(.headline)
+            Text(title).font(.headline)
             Text("\(enabledCount) of \(shown.count) enabled").font(.caption).foregroundStyle(.secondary)
             Spacer()
             if model.bulkBusy { ProgressView().controlSize(.small) }
@@ -531,7 +605,11 @@ struct ContentView: View {
                     }
                 }
                 ToolbarItemGroup {
-                    Toggle("Enabled only", isOn: $model.onlyEnabled)
+                    Picker("Show", selection: $model.filter) {
+                        ForEach(AppFilter.allCases) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.menu)
+                    .help("Filter the list")
                     Button { model.addApp() } label: { Label("Add App…", systemImage: "plus") }
                     Button { model.reload() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
                 }

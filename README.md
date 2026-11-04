@@ -21,7 +21,8 @@ That works, but the overlay then also appears in browsers, Electron apps and oth
 - **Launch once with HUD**: starts an app with the `MTL_HUD_ENABLED=1` environment variable, without saving anything (handy for apps that ignore the per-app setting)
 - Shows which apps are running and offers a one-click restart so changes take effect
 - Detects the global setting and lets you switch it off
-- Search, "enabled only" filter, and **Add App…** for apps in other locations
+- Search, a filter for **All Apps / Games / HUD Enabled**, and **Add App…** for apps in other locations
+- Detects likely games (App Store games category, game controller support, Steam installs, Unity/Unreal/Godot builds); use **Mark as Game** / **Not a Game** in the **…** menu to correct it
 - Checks GitHub for a newer release on launch and shows a download button with the changelog when one is available
 
 ## Requirements
