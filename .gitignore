@@ -1,0 +1,15 @@
+# Build output
+build/
+*.app
+*.zip
+MetalHUDManager
+
+# macOS
+.DS_Store
+
+# Xcode / SwiftPM
+.build/
+.swiftpm/
+DerivedData/
+*.xcuserstate
+xcuserdata/
