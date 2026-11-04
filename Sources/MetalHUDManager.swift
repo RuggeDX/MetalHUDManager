@@ -116,6 +116,59 @@ enum Scanner {
     }
 }
 
+// MARK: - Update checker
+
+struct ReleaseInfo: Decodable {
+    struct Asset: Decodable {
+        let name: String
+        let browserDownloadUrl: URL
+    }
+
+    let tagName: String
+    let body: String?
+    let htmlUrl: URL
+    let assets: [Asset]
+
+    var version: String { tagName.hasPrefix("v") ? String(tagName.dropFirst()) : tagName }
+
+    /// The release's .dmg if it has one, otherwise the release page.
+    var downloadURL: URL { assets.first { $0.name.hasSuffix(".dmg") }?.browserDownloadUrl ?? htmlUrl }
+}
+
+enum Updater {
+    static let repo = "RuggeDX/MetalHUDManager"
+
+    /// Dev builds run as a bare binary without an Info.plist, so they report 0.0.0.
+    static var currentVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
+    }
+
+    /// Compares dotted version numbers. Anything after a "-" (e.g. "-dev") is ignored.
+    static func isNewer(_ a: String, than b: String) -> Bool {
+        func parts(_ v: String) -> [Int] {
+            (v.split(separator: "-").first ?? "").split(separator: ".").map { Int($0) ?? 0 }
+        }
+        let x = parts(a), y = parts(b)
+        for i in 0..<max(x.count, y.count) {
+            let l = i < x.count ? x[i] : 0
+            let r = i < y.count ? y[i] : 0
+            if l != r { return l > r }
+        }
+        return false
+    }
+
+    /// Latest published release (drafts and pre-releases are excluded by GitHub).
+    static func latestRelease() async throws -> ReleaseInfo {
+        var request = URLRequest(url: URL(string: "https://api.github.com/repos/\(repo)/releases/latest")!)
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try decoder.decode(ReleaseInfo.self, from: data)
+    }
+}
+
 // MARK: - View model
 
 @MainActor
@@ -127,6 +180,8 @@ final class Model: ObservableObject {
     @Published var onlyEnabled = false
     @Published var needsRestart: Set<String> = []
     @Published var bulkBusy = false
+    @Published var update: ReleaseInfo?
+    @Published var showUpdate = false
 
     private let extraKey = "extraAppPaths"
     private var extraPaths: [String] {
@@ -153,6 +208,17 @@ final class Model: ObservableObject {
                 self.apps = list
                 self.globalOn = global
                 self.loading = false
+            }
+        }
+    }
+
+    func checkForUpdates() {
+        Task {
+            do {
+                let release = try await Updater.latestRelease()
+                if Updater.isNewer(release.version, than: Updater.currentVersion) { update = release }
+            } catch {
+                NSLog("Update check failed: \(error.localizedDescription)")
             }
         }
     }
@@ -326,6 +392,83 @@ struct BulkToggleRow: View {
     }
 }
 
+/// Renders GitHub release notes: headings, bullet lists and inline Markdown (bold, code, links).
+struct ChangelogView: View {
+    let markdown: String
+
+    var body: some View {
+        let lines = markdown.components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        VStack(alignment: .leading, spacing: 6) {
+            if lines.isEmpty { Text("No release notes.").foregroundStyle(.secondary) }
+            ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                if line.hasPrefix("#") {
+                    Text(inline(String(line.drop(while: { $0 == "#" })).trimmingCharacters(in: .whitespaces)))
+                        .font(.headline)
+                } else if line.hasPrefix("* ") || line.hasPrefix("- ") {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text("•")
+                        Text(inline(String(line.dropFirst(2))))
+                    }
+                } else {
+                    Text(inline(line))
+                }
+            }
+        }
+        .textSelection(.enabled)
+    }
+
+    private func inline(_ s: String) -> AttributedString {
+        (try? AttributedString(markdown: s, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
+            ?? AttributedString(s)
+    }
+}
+
+struct UpdateSheet: View {
+    let release: ReleaseInfo
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.system(size: 36))
+                    .foregroundStyle(Color.accentColor)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("A new version is available").font(.title2.bold())
+                    Text("Metal HUD Manager \(release.version) is available. You have \(Updater.currentVersion).")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Text("What's new").font(.headline)
+            ScrollView {
+                ChangelogView(markdown: release.body ?? "")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+            }
+            .frame(minHeight: 160, maxHeight: 300)
+            .background(RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: .textBackgroundColor)))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.25)))
+
+            HStack {
+                Link("View on GitHub", destination: release.htmlUrl)
+                Spacer()
+                Button("Later") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button("Download") {
+                    NSWorkspace.shared.open(release.downloadURL)
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 480)
+    }
+}
+
 struct ContentView: View {
     @StateObject private var model = Model()
 
@@ -357,6 +500,16 @@ struct ContentView: View {
             .navigationTitle(appTitle)
             .searchable(text: $model.search, prompt: "Search apps")
             .toolbar {
+                ToolbarItem {
+                    if let update = model.update {
+                        Button { model.showUpdate = true } label: {
+                            Label("Update Available", systemImage: "arrow.down.circle.fill")
+                                .symbolRenderingMode(.hierarchical)
+                                .foregroundStyle(Color.accentColor)
+                        }
+                        .help("Version \(update.version) is available")
+                    }
+                }
                 ToolbarItemGroup {
                     Toggle("Enabled only", isOn: $model.onlyEnabled)
                     Button { model.addApp() } label: { Label("Add App…", systemImage: "plus") }
@@ -365,7 +518,13 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 620, minHeight: 480)
-        .onAppear { model.reload() }
+        .sheet(isPresented: $model.showUpdate) {
+            if let update = model.update { UpdateSheet(release: update) }
+        }
+        .onAppear {
+            model.reload()
+            model.checkForUpdates()
+        }
     }
 }
 

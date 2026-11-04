@@ -22,6 +22,7 @@ That works, but the overlay then also appears in browsers, Electron apps and oth
 - Shows which apps are running and offers a one-click restart so changes take effect
 - Detects the global setting and lets you switch it off
 - Search, "enabled only" filter, and **Add App…** for apps in other locations
+- Checks GitHub for a newer release on launch and shows a download button with the changelog when one is available
 
 ## Requirements
 
@@ -73,6 +74,7 @@ Turning a switch off deletes that key again. "Launch once with HUD" uses `NSWork
 
 - Most apps pick up the per-app setting, but some (certain sandboxed apps, Wine/CrossOver wrappers) don't. Use **Launch once with HUD** for those.
 - On recent macOS versions, changing settings for sandboxed apps can trigger a prompt asking whether Metal HUD Manager may access data from other apps. Allow it, or those switches won't stick.
+- On launch the app makes one request to the GitHub API to check for a newer release. Nothing else is sent.
 - Locally built copies are signed ad-hoc, so macOS may ask for that permission again after a rebuild.
 
 ## Reset everything
