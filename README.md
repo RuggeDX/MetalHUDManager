@@ -17,11 +17,13 @@ That works, but the overlay then also appears in browsers, Electron apps and oth
 ## Features
 
 - Lists apps from `/Applications`, `~/Applications` and your Steam library, with icon and bundle ID
-- One switch per app to enable the HUD persistently
+- One switch per app to enable the HUD persistently, plus an "all apps" switch that applies to everything currently shown
 - **Launch once with HUD**: starts an app with the `MTL_HUD_ENABLED=1` environment variable, without saving anything (handy for apps that ignore the per-app setting)
 - Shows which apps are running and offers a one-click restart so changes take effect
 - Detects the global setting and lets you switch it off
-- Search, "enabled only" filter, and **Add App…** for apps in other locations
+- Search, a filter for **All Apps / Games / HUD Enabled**, and **Add App…** for apps in other locations
+- Detects likely games (App Store games category, game controller support, Steam installs, Unity/Unreal/Godot builds); use **Mark as Game** / **Not a Game** in the **…** menu to correct it
+- Checks GitHub for a newer release on launch and shows a download button with the changelog when one is available
 
 ## Requirements
 
@@ -42,7 +44,7 @@ This builds `Metal HUD Manager.app` and copies it to `/Applications`. Without `-
 
 ### Option 2: Download a release
 
-Download the latest `.zip` from the [Releases](../../releases) page and move the app to `/Applications`.
+Download the latest `.dmg` from the [Releases](../../releases) page, open it, and drag **Metal HUD Manager** into the **Applications** folder. A `.zip` is available too if you prefer.
 
 The release builds are **not notarized** by Apple, so macOS will block the first launch. To allow it, open the app once, then go to **System Settings → Privacy & Security** and click **Open Anyway**. Alternatively, remove the quarantine flag yourself:
 
@@ -73,6 +75,7 @@ Turning a switch off deletes that key again. "Launch once with HUD" uses `NSWork
 
 - Most apps pick up the per-app setting, but some (certain sandboxed apps, Wine/CrossOver wrappers) don't. Use **Launch once with HUD** for those.
 - On recent macOS versions, changing settings for sandboxed apps can trigger a prompt asking whether Metal HUD Manager may access data from other apps. Allow it, or those switches won't stick.
+- On launch the app makes one request to the GitHub API to check for a newer release. Nothing else is sent.
 - Locally built copies are signed ad-hoc, so macOS may ask for that permission again after a rebuild.
 
 ## Reset everything
@@ -84,9 +87,19 @@ defaults delete -g MetalForceHudEnabled 2>/dev/null
 defaults delete com.example.game MetalForceHudEnabled   # per app
 ```
 
+## Development
+
+```bash
+./dev.sh
+```
+
+Compiles a debug build, runs it, and rebuilds and relaunches it every time you save `Sources/MetalHUDManager.swift`. Use `./dev.sh --once` to just build and run. Prefix it with `MHM_MOCK_UPDATE=1` to preview the update button and dialog with a fake release. The dev build runs as a bare binary (no icon, separate settings); use `./build-app.sh` to test the real app.
+
+In VS Code, **⇧⌘B** starts the live dev build, and **Terminal → Run Task…** has tasks for the mock-update preview, installing a release build, and building the DMG.
+
 ## Building releases
 
-Pushing a tag starting with `v` triggers the GitHub Actions workflow, which builds a universal (Apple Silicon + Intel) app and attaches the zip to a GitHub release:
+Pushing a tag starting with `v` triggers the GitHub Actions workflow, which builds a universal (Apple Silicon + Intel) app and attaches a `.dmg` and a `.zip` to a GitHub release. To build the disk image locally, run `./make-dmg.sh` after `./build-app.sh`.
 
 ```bash
 git tag v1.0.0
