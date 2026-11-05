@@ -1,6 +1,6 @@
 #!/bin/bash
 # Fast development loop: compiles a debug build, runs it, and rebuilds and
-# relaunches it whenever the source file is saved. Press Ctrl+C to stop.
+# relaunches it whenever a source file is saved. Press Ctrl+C to stop.
 #
 # Usage:
 #   ./dev.sh          -> build, run, and relaunch on every save
@@ -14,7 +14,6 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 
-SOURCE="Sources/MetalHUDManager.swift"
 BIN="build/dev/MetalHUDManager"
 PID=""
 
@@ -31,7 +30,9 @@ trap 'stop; exit 0' INT TERM
 
 build_and_run() {
     echo "==> Compiling ($(date +%H:%M:%S))"
-    if swiftc -parse-as-library -Onone -g -D DEV "$SOURCE" -o "$BIN.new"; then
+    local sources=()
+    while IFS= read -r f; do sources+=("$f"); done < <(find Sources -name '*.swift' | sort)
+    if swiftc -parse-as-library -Onone -g -D DEV "${sources[@]}" -o "$BIN.new"; then
         stop
         mv "$BIN.new" "$BIN"
         "$BIN" &
@@ -49,11 +50,15 @@ if [[ "${1:-}" == "--once" ]]; then
     exit
 fi
 
-echo "==> Watching $SOURCE for changes (Ctrl+C to stop)"
-last=$(stat -f %m "$SOURCE")
+# Fingerprint of every source file's path and mtime, so edits, new files and
+# deletions all trigger a rebuild.
+fingerprint() { find Sources -name '*.swift' -exec stat -f '%m %N' {} + | sort | md5; }
+
+echo "==> Watching Sources/ for changes (Ctrl+C to stop)"
+last=$(fingerprint)
 while true; do
     sleep 1
-    now=$(stat -f %m "$SOURCE")
+    now=$(fingerprint)
     if [[ "$now" != "$last" ]]; then
         last=$now
         build_and_run
