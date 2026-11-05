@@ -1,12 +1,12 @@
 #!/bin/bash
 # Prints the CHANGELOG.md section for a version, used as its GitHub release notes.
 #
-# Usage: ./release-notes.sh 1.1.0
+# Usage: scripts/release-notes.sh 1.1.0
 
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
-VERSION="${1:?Usage: ./release-notes.sh <version>}"
+VERSION="${1:?Usage: scripts/release-notes.sh <version>}"
 
 NOTES="$(awk -v v="$VERSION" '
     /^## \[/ { if (found) exit; if (index($0, "## [" v "]") == 1) { found = 1; next } }

@@ -3,17 +3,17 @@
 # containing the app and a shortcut to /Applications.
 #
 # Usage:
-#   ./build-app.sh && ./make-dmg.sh            -> build/MetalHUDManager.dmg
-#   ./make-dmg.sh path/to/output.dmg           -> custom output path
+#   scripts/build-app.sh && scripts/make-dmg.sh            -> build/MetalHUDManager.dmg
+#   scripts/make-dmg.sh path/to/output.dmg           -> custom output path
 
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 APP_NAME="Metal HUD Manager"
 APP="build/$APP_NAME.app"
 OUT="${1:-build/MetalHUDManager.dmg}"
 
-[[ -d "$APP" ]] || { echo "$APP not found. Run ./build-app.sh first."; exit 1; }
+[[ -d "$APP" ]] || { echo "$APP not found. Run scripts/build-app.sh first."; exit 1; }
 
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT

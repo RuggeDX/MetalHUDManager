@@ -5,9 +5,9 @@
     "tasks": [
         {
             "label": "Run dev build (live reload)",
-            "detail": "./dev.sh: rebuilds and relaunches on every save",
+            "detail": "scripts/dev.sh: rebuilds and relaunches on every save",
             "type": "shell",
-            "command": "./dev.sh",
+            "command": "scripts/dev.sh",
             "group": { "kind": "build", "isDefault": true },
             "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
             "problemMatcher": {
@@ -23,7 +23,7 @@
             "label": "Run dev build with mock update",
             "detail": "Pretends v9.9.9 is available to preview the update dialog",
             "type": "shell",
-            "command": "./dev.sh",
+            "command": "scripts/dev.sh",
             "options": { "env": { "MHM_MOCK_UPDATE": "1" } },
             "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
             "problemMatcher": {
@@ -37,9 +37,9 @@
         },
         {
             "label": "Install release build to /Applications",
-            "detail": "./build-app.sh --install, then opens the app",
+            "detail": "scripts/build-app.sh --install, then opens the app",
             "type": "shell",
-            "command": "./build-app.sh --install && open '/Applications/Metal HUD Manager.app'",
+            "command": "scripts/build-app.sh --install && open '/Applications/Metal HUD Manager.app'",
             "presentation": { "reveal": "always", "panel": "shared", "clear": true },
             "problemMatcher": {
                 "owner": "swiftc",
@@ -54,7 +54,7 @@
             "label": "Build release DMG",
             "detail": "Universal build + build/MetalHUDManager.dmg",
             "type": "shell",
-            "command": "UNIVERSAL=1 ./build-app.sh && ./make-dmg.sh",
+            "command": "UNIVERSAL=1 scripts/build-app.sh && scripts/make-dmg.sh",
             "presentation": { "reveal": "always", "panel": "shared", "clear": true },
             "problemMatcher": {
                 "owner": "swiftc",

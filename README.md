@@ -37,7 +37,7 @@ That works, but the overlay then also appears in browsers, Electron apps and oth
 ```bash
 git clone https://github.com/RuggeDX/MetalHUDManager.git
 cd MetalHUDManager
-./build-app.sh --install
+scripts/build-app.sh --install
 ```
 
 This builds `Metal HUD Manager.app` and copies it to `/Applications`. Without `--install` the app ends up in `./build/`.
@@ -90,18 +90,18 @@ defaults delete com.example.game MetalForceHudEnabled   # per app
 ## Development
 
 ```bash
-./dev.sh
+scripts/dev.sh
 ```
 
-Compiles a debug build, runs it, and rebuilds and relaunches it every time you save a file in `Sources/`. Use `./dev.sh --once` to just build and run. Prefix it with `MHM_MOCK_UPDATE=1` to preview the update button and dialog with a fake release. The dev build runs as a bare binary (no icon, separate settings); use `./build-app.sh` to test the real app.
+Compiles a debug build, runs it, and rebuilds and relaunches it every time you save `Sources/MetalHUDManager.swift`. Use `scripts/dev.sh --once` to just build and run. Prefix it with `MHM_MOCK_UPDATE=1` to preview the update button and dialog with a fake release. The dev build runs as a bare binary (no icon, separate settings); use `scripts/build-app.sh` to test the real app.
 
-In VS Code, **⇧⌘B** starts the live dev build, and **Terminal → Run Task…** has tasks for the mock-update preview, installing a release build, and building the DMG.
+In VS Code, **⇧⌘B** starts the live dev build, and **Terminal → Run Task…** has tasks for the mock-update preview, installing a release build, and building the DMG. With the recommended [Code Runner](https://marketplace.visualstudio.com/items?itemName=formulahendry.code-runner) extension, the ▶ button in the editor title bar runs the open script in `scripts/` (`dev.sh`, `build-app.sh`, `make-dmg.sh`), or starts the dev build when a Swift file is open.
 
 ## Building releases
 
-Pushing a tag starting with `v` triggers the GitHub Actions workflow, which builds a universal (Apple Silicon + Intel) app and attaches a `.dmg` and a `.zip` to a GitHub release. To build the disk image locally, run `./make-dmg.sh` after `./build-app.sh`.
+Pushing a tag starting with `v` triggers the GitHub Actions workflow, which builds a universal (Apple Silicon + Intel) app and attaches a `.dmg` and a `.zip` to a GitHub release. To build the disk image locally, run `scripts/make-dmg.sh` after `scripts/build-app.sh`.
 
-Add a section for the version to [CHANGELOG.md](CHANGELOG.md) first: the workflow uses it as the release notes (check with `./release-notes.sh 1.2.0`), and the app shows it in its update dialog.
+Add a section for the version to [CHANGELOG.md](CHANGELOG.md) first: the workflow uses it as the release notes (check with `scripts/release-notes.sh 1.2.0`), and the app shows it in its update dialog.
 
 ```bash
 git tag v1.2.0
