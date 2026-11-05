@@ -29,7 +29,7 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
           UNIVERSAL: "1"
-        run: ./build-app.sh
+        run: scripts/build-app.sh
 
       - name: Zip app
         run: |
@@ -37,7 +37,7 @@ jobs:
           ditto -c -k --keepParent "Metal HUD Manager.app" "MetalHUDManager-${{ steps.version.outputs.version }}.zip"
 
       - name: Create DMG
-        run: ./make-dmg.sh "build/MetalHUDManager-${{ steps.version.outputs.version }}.dmg"
+        run: scripts/make-dmg.sh "build/MetalHUDManager-${{ steps.version.outputs.version }}.dmg"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -50,7 +50,7 @@ jobs:
       - name: Extract release notes from CHANGELOG.md
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
-          ./release-notes.sh "${{ steps.version.outputs.version }}" > build/RELEASE_NOTES.md
+          scripts/release-notes.sh "${{ steps.version.outputs.version }}" > build/RELEASE_NOTES.md
           cat build/RELEASE_NOTES.md
 
       - name: Publish GitHub release

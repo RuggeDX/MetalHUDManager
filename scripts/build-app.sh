@@ -2,8 +2,8 @@
 # Packages the Swift sources in Sources/ into "Metal HUD Manager.app".
 #
 # Usage:
-#   ./build-app.sh            -> builds into ./build/
-#   ./build-app.sh --install  -> builds and copies the app to /Applications
+#   scripts/build-app.sh            -> builds into ./build/
+#   scripts/build-app.sh --install  -> builds and copies the app to /Applications
 #
 # Environment variables:
 #   VERSION=1.2.0    version written to Info.plist (default 1.0.0)
@@ -11,7 +11,7 @@
 #   BUNDLE_ID=...    override the bundle identifier
 
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 APP_NAME="Metal HUD Manager"
 EXEC_NAME="MetalHUDManager"
