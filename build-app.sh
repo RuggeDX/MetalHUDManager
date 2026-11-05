@@ -1,5 +1,5 @@
 #!/bin/bash
-# Packages MetalHUDManager.swift into "Metal HUD Manager.app".
+# Packages the Swift sources in Sources/ into "Metal HUD Manager.app".
 #
 # Usage:
 #   ./build-app.sh            -> builds into ./build/
@@ -17,7 +17,6 @@ APP_NAME="Metal HUD Manager"
 EXEC_NAME="MetalHUDManager"
 BUNDLE_ID="${BUNDLE_ID:-io.github.ruggedx.MetalHUDManager}"
 VERSION="${VERSION:-1.0.0}"
-SOURCE="Sources/MetalHUDManager.swift"
 MIN_MACOS="13.0"
 
 BUILD_DIR="build"
@@ -26,7 +25,9 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 command -v swiftc >/dev/null || { echo "swiftc not found. Run: xcode-select --install"; exit 1; }
-[[ -f "$SOURCE" ]] || { echo "$SOURCE not found."; exit 1; }
+SOURCES=()
+for f in Sources/*.swift Sources/*/*.swift; do [[ -f "$f" ]] && SOURCES+=("$f"); done
+[[ ${#SOURCES[@]} -gt 0 ]] || { echo "No Swift sources found in Sources/."; exit 1; }
 
 echo "==> Preparing bundle"
 rm -rf "$APP"
@@ -35,11 +36,11 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 echo "==> Compiling"
 BIN="$APP/Contents/MacOS/$EXEC_NAME"
 if [[ "${UNIVERSAL:-0}" == "1" ]]; then
-    swiftc -parse-as-library -O -target "arm64-apple-macos$MIN_MACOS"  "$SOURCE" -o "$TMP/$EXEC_NAME-arm64"
-    swiftc -parse-as-library -O -target "x86_64-apple-macos$MIN_MACOS" "$SOURCE" -o "$TMP/$EXEC_NAME-x86_64"
+    swiftc -parse-as-library -O -target "arm64-apple-macos$MIN_MACOS"  "${SOURCES[@]}" -o "$TMP/$EXEC_NAME-arm64"
+    swiftc -parse-as-library -O -target "x86_64-apple-macos$MIN_MACOS" "${SOURCES[@]}" -o "$TMP/$EXEC_NAME-x86_64"
     lipo -create "$TMP/$EXEC_NAME-arm64" "$TMP/$EXEC_NAME-x86_64" -output "$BIN"
 else
-    swiftc -parse-as-library -O "$SOURCE" -o "$BIN"
+    swiftc -parse-as-library -O "${SOURCES[@]}" -o "$BIN"
 fi
 
 echo "==> Generating icon"
