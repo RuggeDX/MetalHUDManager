@@ -31,7 +31,7 @@ trap 'stop; exit 0' INT TERM
 build_and_run() {
     echo "==> Compiling ($(date +%H:%M:%S))"
     local sources=()
-    while IFS= read -r f; do sources+=("$f"); done < <(find Sources -name '*.swift' | sort)
+    for f in Sources/*.swift Sources/*/*.swift; do [[ -f "$f" ]] && sources+=("$f"); done
     if swiftc -parse-as-library -Onone -g -D DEV "${sources[@]}" -o "$BIN.new"; then
         stop
         mv "$BIN.new" "$BIN"

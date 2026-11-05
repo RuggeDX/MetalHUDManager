@@ -26,7 +26,7 @@ trap 'rm -rf "$TMP"' EXIT
 
 command -v swiftc >/dev/null || { echo "swiftc not found. Run: xcode-select --install"; exit 1; }
 SOURCES=()
-while IFS= read -r f; do SOURCES+=("$f"); done < <(find Sources -name '*.swift' | sort)
+for f in Sources/*.swift Sources/*/*.swift; do [[ -f "$f" ]] && SOURCES+=("$f"); done
 [[ ${#SOURCES[@]} -gt 0 ]] || { echo "No Swift sources found in Sources/."; exit 1; }
 
 echo "==> Preparing bundle"
