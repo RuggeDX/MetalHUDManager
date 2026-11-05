@@ -101,9 +101,11 @@ In VS Code, **⇧⌘B** starts the live dev build, and **Terminal → Run Task�
 
 Pushing a tag starting with `v` triggers the GitHub Actions workflow, which builds a universal (Apple Silicon + Intel) app and attaches a `.dmg` and a `.zip` to a GitHub release. To build the disk image locally, run `./make-dmg.sh` after `./build-app.sh`.
 
+Add a section for the version to [CHANGELOG.md](CHANGELOG.md) first: the workflow uses it as the release notes (check with `./release-notes.sh 1.2.0`), and the app shows it in its update dialog.
+
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.2.0
+git push origin v1.2.0
 ```
 
 ## License
