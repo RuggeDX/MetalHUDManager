@@ -93,9 +93,18 @@ defaults delete com.example.game MetalForceHudEnabled   # per app
 scripts/dev.sh
 ```
 
-Compiles a debug build, runs it, and rebuilds and relaunches it every time you save `Sources/MetalHUDManager.swift`. Use `scripts/dev.sh --once` to just build and run. Prefix it with `MHM_MOCK_UPDATE=1` to preview the update button and dialog with a fake release. The dev build runs as a bare binary (no icon, separate settings); use `scripts/build-app.sh` to test the real app.
+Compiles a debug build, runs it, and rebuilds and relaunches it every time you save a file in `Sources/`. Use `scripts/dev.sh --once` to just build and run. Prefix it with `MHM_MOCK_UPDATE=1` to preview the update button and dialog with a fake release. The dev build runs as a bare binary (no icon, separate settings); use `scripts/build-app.sh` to test the real app.
 
 In VS Code, **⇧⌘B** starts the live dev build, and **Terminal → Run Task…** has tasks for the mock-update preview, installing a release build, and building the DMG. With the recommended [Code Runner](https://marketplace.visualstudio.com/items?itemName=formulahendry.code-runner) extension, the ▶ button in the editor title bar runs the open script in `scripts/` (`dev.sh`, `build-app.sh`, `make-dmg.sh`), or starts the dev build when a Swift file is open.
+
+### Linting
+
+```sh
+brew install swiftlint shellcheck
+scripts/lint.sh          # add --fix to auto-correct what SwiftLint can
+```
+
+[SwiftLint](https://github.com/realm/SwiftLint) checks `Sources/` against the rules in [.swiftlint.yml](.swiftlint.yml) (warnings count as failures), and [ShellCheck](https://www.shellcheck.net) checks `scripts/`. The **Lint** workflow runs the same checks on every pull request, and a pull request can only be merged into `main` or `develop` once both lint and the build pass. In VS Code, run the **Lint** task to get the problems in the Problems panel.
 
 ## Building releases
 

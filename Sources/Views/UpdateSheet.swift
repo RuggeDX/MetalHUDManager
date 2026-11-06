@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 
 /// Renders GitHub release notes: headings, bullet lists and inline Markdown (bold, code, links).
 struct ChangelogView: View {

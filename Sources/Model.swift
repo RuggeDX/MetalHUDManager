@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 
 @MainActor
 final class Model: ObservableObject {
@@ -17,7 +17,8 @@ final class Model: ObservableObject {
         didSet { UserDefaults.standard.set(filter.rawValue, forKey: Keys.filter) }
     }
     /// Per-app "is a game" choices that override the detection heuristic.
-    @Published var gameOverrides = UserDefaults.standard.dictionary(forKey: Keys.gameOverrides) as? [String: Bool] ?? [:] {
+    @Published var gameOverrides =
+        UserDefaults.standard.dictionary(forKey: Keys.gameOverrides) as? [String: Bool] ?? [:] {
         didSet { UserDefaults.standard.set(gameOverrides, forKey: Keys.gameOverrides) }
     }
     @Published var needsRestart: Set<String> = []

@@ -5,8 +5,8 @@
 //   swiftc -parse-as-library -O $(find Sources -name '*.swift') -o MetalHUDManager
 //   ./MetalHUDManager
 
-import SwiftUI
 import AppKit
+import SwiftUI
 
 // MARK: - Build flavor
 

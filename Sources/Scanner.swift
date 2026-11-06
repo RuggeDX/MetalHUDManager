@@ -59,13 +59,16 @@ enum Scanner {
     static func looksLikeGame(url: URL, info: [String: Any]) -> Bool {
         if let category = info["LSApplicationCategoryType"] as? String,
            category == "public.app-category.games" || category.hasSuffix("-games") { return true }
-        if info["GCSupportsControllerUserInteraction"] != nil || info["GCSupportedGameControllers"] != nil { return true }
+        if info["GCSupportsControllerUserInteraction"] != nil || info["GCSupportedGameControllers"] != nil {
+            return true
+        }
         if url.path.contains("/steamapps/common/") { return true }
         let fm = FileManager.default
         if gameMarkers.contains(where: { fm.fileExists(atPath: url.appendingPathComponent($0).path) }) { return true }
         // Godot exports ship their game data as a .pck file.
         let resources = url.appendingPathComponent("Contents/Resources")
-        if let files = try? fm.contentsOfDirectory(atPath: resources.path), files.contains(where: { $0.hasSuffix(".pck") }) {
+        if let files = try? fm.contentsOfDirectory(atPath: resources.path),
+           files.contains(where: { $0.hasSuffix(".pck") }) {
             return true
         }
         return false
