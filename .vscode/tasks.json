@@ -36,6 +36,21 @@
             }
         },
         {
+            "label": "Lint",
+            "detail": "scripts/lint.sh: SwiftLint + ShellCheck, same as CI",
+            "type": "shell",
+            "command": "scripts/lint.sh",
+            "presentation": { "reveal": "always", "panel": "shared", "clear": true },
+            "problemMatcher": {
+                "owner": "lint",
+                "fileLocation": ["autoDetect", "${workspaceFolder}"],
+                "pattern": {
+                    "regexp": "^(.*?):(\\d+):(\\d+):\\s+(error|warning):\\s+(.*)$",
+                    "file": 1, "line": 2, "column": 3, "severity": 4, "message": 5
+                }
+            }
+        },
+        {
             "label": "Install release build to /Applications",
             "detail": "scripts/build-app.sh --install, then opens the app",
             "type": "shell",

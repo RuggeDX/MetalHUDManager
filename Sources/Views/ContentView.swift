@@ -15,8 +15,11 @@ struct ContentView: View {
                     AppRow(app: app, model: model)
                 }
                 .overlay {
-                    if model.loading { ProgressView("Scanning apps…") }
-                    else if model.filtered.isEmpty { Text("No apps match.").foregroundStyle(.secondary) }
+                    if model.loading {
+                        ProgressView("Scanning apps…")
+                    } else if model.filtered.isEmpty {
+                        Text("No apps match.").foregroundStyle(.secondary)
+                    }
                 }
             }
             .navigationTitle(appTitle)

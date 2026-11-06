@@ -12,7 +12,7 @@
 # "MetalHUDManager". Use scripts/build-app.sh for the real app.
 
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 
 BIN="build/dev/MetalHUDManager"
 PID=""

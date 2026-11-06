@@ -1,0 +1,30 @@
+# SwiftLint configuration. Run locally with `swiftlint` (brew install swiftlint).
+# CI runs `swiftlint lint --strict`, so warnings fail the build too.
+
+included:
+  - Sources
+
+disabled_rules:
+  # Trailing commas in multi-line literals keep diffs small; we allow them.
+  - trailing_comma
+
+opt_in_rules:
+  - empty_count
+  - first_where
+  - contains_over_first_not_nil
+  - closure_spacing
+  - operator_usage_whitespace
+  - redundant_nil_coalescing
+  - sorted_imports
+  - vertical_whitespace_closing_braces
+  - yoda_condition
+
+line_length:
+  warning: 120
+  ignores_urls: true
+  ignores_comments: false
+
+identifier_name:
+  # Short names like `i`, `on`, `fm` are idiomatic in small scopes.
+  min_length: 1
+  max_length: 50
